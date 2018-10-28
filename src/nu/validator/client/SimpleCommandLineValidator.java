@@ -35,6 +35,7 @@ import nu.validator.htmlparser.sax.XmlSerializer;
 import nu.validator.io.SystemIdIOException;
 import nu.validator.messages.GnuMessageEmitter;
 import nu.validator.messages.JsonMessageEmitter;
+import nu.validator.messages.MessageEmitter;
 import nu.validator.messages.MessageEmitterAdapter;
 import nu.validator.messages.TextMessageEmitter;
 import nu.validator.messages.XmlMessageEmitter;
@@ -67,6 +68,7 @@ public class SimpleCommandLineValidator {
     private static Pattern filterPattern;
 
     private static MessageEmitterAdapter errorHandler;
+    private static MessageEmitter errorHandlerEmitter;
 
     private static boolean verbose;
 
@@ -528,24 +530,37 @@ public class SimpleCommandLineValidator {
         SourceCode sourceCode = validator.getSourceCode();
         ImageCollector imageCollector = new ImageCollector(sourceCode);
         boolean showSource = false;
+        if (errorHandlerEmitter == null) {
+            if (outputFormat == OutputFormat.TEXT) {
+                errorHandlerEmitter = new TextMessageEmitter(out, asciiQuotes);
+            } else if (outputFormat == OutputFormat.GNU) {
+                errorHandlerEmitter = new GnuMessageEmitter(out, asciiQuotes);
+            } else if (outputFormat == OutputFormat.XML) {
+                errorHandlerEmitter = new XmlMessageEmitter(new XmlSerializer(out));
+            } else if (outputFormat == OutputFormat.JSON) {
+                String callback = null;
+                errorHandlerEmitter = new JsonMessageEmitter(
+                        new nu.validator.json.Serializer(out), callback);
+            } else {
+                throw new RuntimeException("Bug. Should be unreachable.");
+            }
+        }
         if (outputFormat == OutputFormat.TEXT) {
             errorHandler = new MessageEmitterAdapter(filterPattern, sourceCode,
-                    showSource, imageCollector, lineOffset, true,
-                    new TextMessageEmitter(out, asciiQuotes));
+                    showSource, imageCollector, lineOffset, true, errorHandlerEmitter
+                    );
         } else if (outputFormat == OutputFormat.GNU) {
             errorHandler = new MessageEmitterAdapter(filterPattern, sourceCode,
                     showSource, imageCollector, lineOffset, true,
-                    new GnuMessageEmitter(out, asciiQuotes));
+                    errorHandlerEmitter);
         } else if (outputFormat == OutputFormat.XML) {
             errorHandler = new MessageEmitterAdapter(filterPattern, sourceCode,
                     showSource, imageCollector, lineOffset, true,
-                    new XmlMessageEmitter(new XmlSerializer(out)));
+                    errorHandlerEmitter);
         } else if (outputFormat == OutputFormat.JSON) {
-            String callback = null;
             errorHandler = new MessageEmitterAdapter(filterPattern, sourceCode,
                     showSource, imageCollector, lineOffset, true,
-                    new JsonMessageEmitter(
-                            new nu.validator.json.Serializer(out), callback));
+                    errorHandlerEmitter);
         } else {
             throw new RuntimeException("Bug. Should be unreachable.");
         }
